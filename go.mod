@@ -4,6 +4,7 @@ go 1.21
 
 require (
 	github.com/casbin/casbin/v2 v2.77.2
+	github.com/casbin/mongodb-adapter/v3 v3.5.0
 	github.com/gin-gonic/gin v1.9.1
 	github.com/go-playground/validator/v10 v10.15.4
 	github.com/golang-jwt/jwt/v5 v5.0.0
