@@ -4,7 +4,7 @@ import (
 	"context"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
+	mopt "go.mongodb.org/mongo-driver/mongo/options"
 	"go.uber.org/zap"
 	"reflect"
 	"time"
@@ -221,7 +221,7 @@ func (d *BaseMongoDAO[T]) UpdateMany(ctx context.Context, filter any, model []an
 }
 
 func (d *BaseMongoDAO[T]) Find(ctx context.Context, filter any) ([]T, error) {
-	opts := new(options.FindOptions)
+	opts := new(mopt.FindOptions)
 	opts.SetSort(bson.D{{"created_at", -1}})
 	cur, err := d.Col.Find(ctx, filter, opts)
 	defer cur.Close(ctx)
@@ -242,7 +242,7 @@ func (d *BaseMongoDAO[T]) Find(ctx context.Context, filter any) ([]T, error) {
 }
 
 func (d *BaseMongoDAO[T]) FindOne(ctx context.Context, filter any) (T, error) {
-	opts := new(options.FindOneOptions)
+	opts := new(mopt.FindOneOptions)
 	opts.SetSort(bson.D{{"created_at", -1}})
 	cur := d.Col.FindOne(ctx, filter, opts)
 	var r T
@@ -253,7 +253,7 @@ func (d *BaseMongoDAO[T]) FindOne(ctx context.Context, filter any) (T, error) {
 }
 
 func (d *BaseMongoDAO[T]) Paging(ctx context.Context, filter any, paging PagingQuery) ([]T, int64, error) {
-	opts := new(options.FindOptions)
+	opts := new(mopt.FindOptions)
 	opts.SetSort(bson.D{{"created_at", -1}})
 	opts.SetLimit(paging.Count)
 	opts.SetSkip(paging.Count * paging.Page)
