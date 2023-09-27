@@ -2,6 +2,7 @@ package hin
 
 import (
 	"context"
+	"github.com/spf13/viper"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	mopt "go.mongodb.org/mongo-driver/mongo/options"
@@ -181,6 +182,13 @@ func NewMongoDAO[T any](
 	client *mongo.Client,
 	opts *MongoDAOOptions,
 ) *BaseMongoDAO[T] {
+	defaultDatabase := viper.GetString("mongo.database")
+	if defaultDatabase == "" {
+		logger.Warn("NewMongoDAO: defaultDatabase not set")
+	}
+	if opts.DB == "" {
+		opts.DB = defaultDatabase
+	}
 	db := client.Database(opts.DB)
 	col := db.Collection(opts.Table)
 	return &BaseMongoDAO[T]{
