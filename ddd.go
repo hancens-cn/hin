@@ -66,6 +66,8 @@ func (s *BaseSrv[E]) Remove(ctx context.Context, query any) error {
 type BaseConverter[M any, E any] interface {
 	ToModel(e E) M
 	ToEntity(m M) E
+	ToEntities(ms []M) []E
+	ToModels(es []E) []M
 }
 
 type BaseDAO[T any] interface {
@@ -91,32 +93,78 @@ type BaseRepository[E any] interface {
 
 type BaseRepo[M any, E any] struct {
 	Dao    BaseDAO[M]
-	Cv     BaseConverter[M, E]
 	Logger *Logger
+	Cv     BaseConverter[M, E]
 }
 
 func NewBaseRepository[M any, E any](
 	dao BaseDAO[M],
-	cv BaseConverter[M, E],
 	logger *Logger,
 ) *BaseRepo[M, E] {
 	return &BaseRepo[M, E]{
 		dao,
-		cv,
 		logger,
+		nil,
 	}
 }
 
+func (r *BaseRepo[M, E]) WithModelConverter(cv BaseConverter[M, E]) *BaseRepo[M, E] {
+	r.Cv = cv
+	return r
+}
+
 func (r *BaseRepo[M, E]) toEntities(ms []M) []E {
+	if r.Cv != nil && r.Cv.ToEntities != nil {
+		return r.Cv.ToEntities(ms)
+	}
+
 	es := make([]E, 0)
 	for _, m := range ms {
-		es = append(es, r.Cv.ToEntity(m))
+		es = append(es, r.toEntity(m))
 	}
 	return es
 }
 
+func (r *BaseRepo[M, E]) toModels(es []E) []M {
+	if r.Cv != nil && r.Cv.ToModels != nil {
+		return r.Cv.ToModels(es)
+	}
+
+	ms := make([]M, 0)
+	for _, e := range es {
+		ms = append(ms, r.toModel(e))
+	}
+	return ms
+}
+
+func (r *BaseRepo[M, E]) toModel(e E) M {
+	if r.Cv != nil && r.Cv.ToModel != nil {
+		return r.Cv.ToModel(e)
+	}
+
+	var m M
+	if err := Copy(&m, e); err != nil {
+		r.Logger.Error("Error Copier Entity toModel", zap.Error(err))
+	}
+
+	return m
+}
+
+func (r *BaseRepo[M, E]) toEntity(m M) E {
+	if r.Cv != nil && r.Cv.ToEntity != nil {
+		return r.Cv.ToEntity(m)
+	}
+
+	var e E
+	if err := Copy(&e, m); err != nil {
+		r.Logger.Error("Error Copier Model toEntity", zap.Error(err))
+	}
+
+	return e
+}
+
 func (r *BaseRepo[M, E]) Save(ctx context.Context, entity E) error {
-	m := r.Cv.ToModel(entity)
+	m := r.toModel(entity)
 	rv := reflect.ValueOf(&m)
 	if v := rv.Elem().FieldByName("ID"); v.String() != "00000000000000000000" {
 		// before update data set updated_at
@@ -143,7 +191,7 @@ func (r *BaseRepo[M, E]) FindOne(ctx context.Context, filter CriteriaBuilder) (E
 		var e E
 		return e, err
 	} else {
-		return r.Cv.ToEntity(m), nil
+		return r.toEntity(m), nil
 	}
 }
 
