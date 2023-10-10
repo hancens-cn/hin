@@ -25,13 +25,13 @@ e = some(where (p.eft == allow))
 m = g(r.sub, p.sub) && keyMatch(r.obj, p.obj) && (r.act == p.act || p.act == "*")
 `
 
-func NewCasbin(mongoCli *mongo.Client) *casbin.Enforcer {
+func NewCasbin(mongoCli *mongo.Client) (*casbin.Enforcer, error) {
 	adapter, err := mongodbadapter.NewAdapterByDB(mongoCli, &mongodbadapter.AdapterConfig{
 		DatabaseName:   viper.GetString("casbin.database"),
 		CollectionName: viper.GetString("casbin.collection"),
 	})
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 
 	var m model.Model
@@ -41,14 +41,9 @@ func NewCasbin(mongoCli *mongo.Client) *casbin.Enforcer {
 	} else {
 		m, err = model.NewModelFromFile(modelFile)
 		if err != nil {
-			panic(err)
+			return nil, err
 		}
 	}
 
-	c, err := casbin.NewEnforcer(m, adapter)
-	if err != nil {
-		panic(err)
-	}
-
-	return c
+	return casbin.NewEnforcer(m, adapter)
 }

@@ -9,7 +9,7 @@ import (
 	"log"
 )
 
-func NewMongoDB(logger *Logger) *mongo.Client {
+func NewMongoDB(logger *Logger) (*mongo.Client, func(), error) {
 	if !viper.IsSet("mongo.uri") {
 		logger.Warn("WARN: mongo connect info was use for local test")
 		viper.Set("mongo.uri", "mongodb://localhost:27017/")
@@ -25,9 +25,10 @@ func NewMongoDB(logger *Logger) *mongo.Client {
 		})
 	}
 
-	if client, err := mongo.Connect(context.Background(), opts); err != nil {
-		panic(err)
-	} else {
-		return client
-	}
+	client, err := mongo.Connect(context.Background(), opts)
+	return client, func() {
+		if err = client.Disconnect(context.TODO()); err != nil {
+			panic(err)
+		}
+	}, err
 }
