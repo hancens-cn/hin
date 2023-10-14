@@ -10,10 +10,10 @@ var (
 	_Int64 int64 = 0
 )
 
-type copyOption func(co copier.Option)
+type copyOption func(co *copier.Option)
 
 func WithCopyConverters(opts []copier.TypeConverter) copyOption {
-	return func(co copier.Option) {
+	return func(co *copier.Option) {
 		co.Converters = append(co.Converters, opts...)
 	}
 }
@@ -70,7 +70,7 @@ func Copy(to any, from any, opts ...copyOption) error {
 	}
 
 	for _, o := range opts {
-		o(copierOption)
+		o(&copierOption)
 	}
 
 	return copier.CopyWithOption(to, from, copierOption)
