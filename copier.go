@@ -10,8 +10,17 @@ var (
 	_Int64 int64 = 0
 )
 
-func Copy(to any, from any) error {
-	opts := copier.Option{
+type copyOption func(co copier.Option)
+
+func WithCopyConverters(opts []copier.TypeConverter) copyOption {
+	return func(co copier.Option) {
+		co.Converters = append(co.Converters, opts...)
+	}
+}
+
+func Copy(to any, from any, opts ...copyOption) error {
+
+	copierOption := copier.Option{
 		Converters: []copier.TypeConverter{
 			{
 				SrcType: HID{},
@@ -59,5 +68,10 @@ func Copy(to any, from any) error {
 			},
 		},
 	}
-	return copier.CopyWithOption(to, from, opts)
+
+	for _, o := range opts {
+		o(copierOption)
+	}
+
+	return copier.CopyWithOption(to, from, copierOption)
 }

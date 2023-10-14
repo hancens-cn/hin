@@ -2,6 +2,7 @@ package hin
 
 import (
 	"context"
+	"github.com/jinzhu/copier"
 	"github.com/spf13/viper"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -92,9 +93,10 @@ type BaseRepository[E any] interface {
 }
 
 type BaseRepo[M any, E any] struct {
-	Dao    BaseDAO[M]
-	Logger *Logger
-	Cv     BaseConverter[M, E]
+	Dao           BaseDAO[M]
+	Logger        *Logger
+	Cv            BaseConverter[M, E]
+	TypeConverter []copier.TypeConverter
 }
 
 func NewBaseRepository[M any, E any](
@@ -105,11 +107,17 @@ func NewBaseRepository[M any, E any](
 		dao,
 		logger,
 		nil,
+		make([]copier.TypeConverter, 0),
 	}
 }
 
 func (r *BaseRepo[M, E]) WithModelConverter(cv BaseConverter[M, E]) *BaseRepo[M, E] {
 	r.Cv = cv
+	return r
+}
+
+func (r *BaseRepo[M, E]) WithTypeConverter(tc []copier.TypeConverter) *BaseRepo[M, E] {
+	r.TypeConverter = tc
 	return r
 }
 
@@ -143,7 +151,7 @@ func (r *BaseRepo[M, E]) toModel(e E) M {
 	}
 
 	var m M
-	if err := Copy(&m, e); err != nil {
+	if err := Copy(&m, e, WithCopyConverters(r.TypeConverter)); err != nil {
 		r.Logger.Error("Error Copier Entity toModel", zap.Error(err))
 	}
 
@@ -156,7 +164,7 @@ func (r *BaseRepo[M, E]) toEntity(m M) E {
 	}
 
 	var e E
-	if err := Copy(&e, m); err != nil {
+	if err := Copy(&e, m, WithCopyConverters(r.TypeConverter)); err != nil {
 		r.Logger.Error("Error Copier Model toEntity", zap.Error(err))
 	}
 
