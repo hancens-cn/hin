@@ -2,6 +2,7 @@ package hin
 
 import (
 	"errors"
+	"github.com/samber/lo"
 	"go.mongodb.org/mongo-driver/bson"
 	"reflect"
 	"strings"
@@ -49,31 +50,53 @@ func buildMgoSql(sql string, args ...any) bson.M {
 	}
 
 	vc := 0
-	for _, sep := range strings.Split(sql, " AND ") {
-		q := strings.Split(sep, " ")
-		k := q[0]
-		var v any
-
-		if k == "id" && !strings.Contains(sql, "_id") {
-			k = "_id"
+	for _, syntax := range []string{" AND ", " OR "} {
+		if !strings.Contains(sql, syntax) {
+			continue
 		}
 
-		if "?" == q[2] {
-			v = args[vc]
-			vc++
-		} else {
-			v = q[2]
+		_bm := bson.M{}
+		for _, sep := range strings.Split(sql, syntax) {
+			q := strings.Split(sep, " ")
+			if len(q) > 3 {
+				continue
+			}
+
+			k := q[0]
+			var v any
+
+			if k == "id" && !strings.Contains(sql, "_id") {
+				k = "_id"
+			}
+
+			if "?" == q[2] {
+				v = args[vc]
+				vc++
+			} else {
+				v = q[2]
+			}
+
+			switch q[1] {
+			case "=":
+				_bm[k] = v
+			case "!=":
+				_bm[k] = bson.M{"$ne": v}
+			case "like":
+				_bm[k] = bson.M{"$regex": v}
+			case "in":
+				_bm[k] = bson.M{"$in": v}
+			}
 		}
 
-		switch q[1] {
-		case "=":
-			bm[k] = v
-		case "!=":
-			bm[k] = bson.M{"$ne": v}
-		case "like":
-			bm[k] = bson.M{"$regex": v}
-		case "in":
-			bm[k] = bson.M{"$in": v}
+		switch syntax {
+		case " AND ":
+			bm = lo.Assign(bm, _bm)
+		case " OR ":
+			var _ob []bson.M
+			for k, v := range _bm {
+				_ob = append(_ob, bson.M{k: v})
+			}
+			bm["$or"] = _ob
 		}
 	}
 	return bm

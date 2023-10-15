@@ -122,7 +122,7 @@ func (r *BaseRepo[M, E]) WithTypeConverter(tc []copier.TypeConverter) *BaseRepo[
 }
 
 func (r *BaseRepo[M, E]) toEntities(ms []M) []E {
-	if r.Cv != nil && r.Cv.ToEntities != nil {
+	if r.Cv != nil {
 		return r.Cv.ToEntities(ms)
 	}
 
@@ -134,7 +134,7 @@ func (r *BaseRepo[M, E]) toEntities(ms []M) []E {
 }
 
 func (r *BaseRepo[M, E]) toModels(es []E) []M {
-	if r.Cv != nil && r.Cv.ToModels != nil {
+	if r.Cv != nil {
 		return r.Cv.ToModels(es)
 	}
 
@@ -146,7 +146,7 @@ func (r *BaseRepo[M, E]) toModels(es []E) []M {
 }
 
 func (r *BaseRepo[M, E]) toModel(e E) M {
-	if r.Cv != nil && r.Cv.ToModel != nil {
+	if r.Cv != nil {
 		return r.Cv.ToModel(e)
 	}
 
@@ -159,7 +159,7 @@ func (r *BaseRepo[M, E]) toModel(e E) M {
 }
 
 func (r *BaseRepo[M, E]) toEntity(m M) E {
-	if r.Cv != nil && r.Cv.ToEntity != nil {
+	if r.Cv != nil {
 		return r.Cv.ToEntity(m)
 	}
 
