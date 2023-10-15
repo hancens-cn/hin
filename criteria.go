@@ -50,8 +50,8 @@ func buildMgoSql(sql string, args ...any) bson.M {
 	}
 
 	vc := 0
-	for _, syntax := range []string{" AND ", " OR "} {
-		if !strings.Contains(sql, syntax) {
+	for si, syntax := range []string{" AND ", " OR "} {
+		if si > 0 && !strings.Contains(sql, syntax) {
 			continue
 		}
 
