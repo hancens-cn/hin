@@ -121,31 +121,31 @@ func (r *BaseRepo[M, E]) WithTypeConverter(tc []copier.TypeConverter) *BaseRepo[
 	return r
 }
 
-func (r *BaseRepo[M, E]) toEntities(ms []M) []E {
+func (r *BaseRepo[M, E]) ToEntities(ms []M) []E {
 	if r.Cv != nil {
 		return r.Cv.ToEntities(ms)
 	}
 
 	es := make([]E, 0)
 	for _, m := range ms {
-		es = append(es, r.toEntity(m))
+		es = append(es, r.ToEntity(m))
 	}
 	return es
 }
 
-func (r *BaseRepo[M, E]) toModels(es []E) []M {
+func (r *BaseRepo[M, E]) ToModels(es []E) []M {
 	if r.Cv != nil {
 		return r.Cv.ToModels(es)
 	}
 
 	ms := make([]M, 0)
 	for _, e := range es {
-		ms = append(ms, r.toModel(e))
+		ms = append(ms, r.ToModel(e))
 	}
 	return ms
 }
 
-func (r *BaseRepo[M, E]) toModel(e E) M {
+func (r *BaseRepo[M, E]) ToModel(e E) M {
 	if r.Cv != nil {
 		return r.Cv.ToModel(e)
 	}
@@ -158,7 +158,7 @@ func (r *BaseRepo[M, E]) toModel(e E) M {
 	return m
 }
 
-func (r *BaseRepo[M, E]) toEntity(m M) E {
+func (r *BaseRepo[M, E]) ToEntity(m M) E {
 	if r.Cv != nil {
 		return r.Cv.ToEntity(m)
 	}
@@ -172,7 +172,7 @@ func (r *BaseRepo[M, E]) toEntity(m M) E {
 }
 
 func (r *BaseRepo[M, E]) Save(ctx context.Context, entity E) error {
-	m := r.toModel(entity)
+	m := r.ToModel(entity)
 	rv := reflect.ValueOf(&m)
 	if v := rv.Elem().FieldByName("ID"); v.String() != "00000000000000000000" {
 		// before update data set updated_at
@@ -190,7 +190,7 @@ func (r *BaseRepo[M, E]) Find(ctx context.Context, filter CriteriaBuilder) ([]E,
 	if ms, err := r.Dao.Find(ctx, filter.Mgo()); err != nil {
 		return nil, err
 	} else {
-		return r.toEntities(ms), nil
+		return r.ToEntities(ms), nil
 	}
 }
 
@@ -199,7 +199,7 @@ func (r *BaseRepo[M, E]) FindOne(ctx context.Context, filter CriteriaBuilder) (E
 		var e E
 		return e, err
 	} else {
-		return r.toEntity(m), nil
+		return r.ToEntity(m), nil
 	}
 }
 
@@ -207,7 +207,7 @@ func (r *BaseRepo[M, E]) Paging(ctx context.Context, filter CriteriaBuilder, pag
 	if ms, count, err := r.Dao.Paging(ctx, filter.Mgo(), paging); err != nil {
 		return nil, 0, err
 	} else {
-		return r.toEntities(ms), count, nil
+		return r.ToEntities(ms), count, nil
 	}
 }
 
