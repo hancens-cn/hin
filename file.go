@@ -16,5 +16,8 @@ func FileMD5(file io.Reader) (string, error) {
 }
 
 func FileUrl(path string) string {
+	if path == "" {
+		return ""
+	}
 	return viper.GetString("file.domain") + "/" + path
 }
