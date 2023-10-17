@@ -18,6 +18,24 @@ func WithCopyConverters(opts []copier.TypeConverter) copyOption {
 	}
 }
 
+func WithCopyIgnoreEmpty(v bool) copyOption {
+	return func(co *copier.Option) {
+		co.IgnoreEmpty = v
+	}
+}
+
+func WithCopyCaseSensitive(v bool) copyOption {
+	return func(co *copier.Option) {
+		co.CaseSensitive = v
+	}
+}
+
+func WithCopyDeep(v bool) copyOption {
+	return func(co *copier.Option) {
+		co.DeepCopy = v
+	}
+}
+
 func Copy(to any, from any, opts ...copyOption) error {
 
 	copierOption := copier.Option{
