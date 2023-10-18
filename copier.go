@@ -3,6 +3,7 @@ package hin
 import (
 	"errors"
 	"github.com/jinzhu/copier"
+	"reflect"
 	"time"
 )
 
@@ -10,33 +11,69 @@ var (
 	_Int64 int64 = 0
 )
 
-type copyOption func(co *copier.Option)
+type CopyOption func(co *copier.Option)
 
-func WithCopyConverters(opts []copier.TypeConverter) copyOption {
+func WithCopyConverters(opts []copier.TypeConverter) CopyOption {
 	return func(co *copier.Option) {
 		co.Converters = append(co.Converters, opts...)
 	}
 }
 
-func WithCopyIgnoreEmpty(v bool) copyOption {
+func WithCopyIgnoreEmpty(v bool) CopyOption {
 	return func(co *copier.Option) {
 		co.IgnoreEmpty = v
 	}
 }
 
-func WithCopyCaseSensitive(v bool) copyOption {
+func WithCopyCaseSensitive(v bool) CopyOption {
 	return func(co *copier.Option) {
 		co.CaseSensitive = v
 	}
 }
 
-func WithCopyDeep(v bool) copyOption {
+func WithCopyDeep(v bool) CopyOption {
 	return func(co *copier.Option) {
 		co.DeepCopy = v
 	}
 }
 
-func Copy(to any, from any, opts ...copyOption) error {
+func WithFilter(from any, to any, keys []string, skipOrOnly bool) CopyOption {
+	return func(co *copier.Option) {
+		fields := make([]string, 0)
+		mapping := map[string]string{}
+		t := reflect.TypeOf(from)
+
+		for i := 0; i < t.NumField(); i++ {
+			field := t.Field(i)
+			fields = append(fields, field.Name)
+		}
+
+		for _, k := range fields {
+
+			if skipOrOnly {
+				mapping[k] = k
+			} else {
+				mapping[k] = "_"
+			}
+
+			for _, key := range keys {
+				if k == key {
+					if !skipOrOnly {
+						mapping[k] = k
+					} else {
+						mapping[k] = "_"
+					}
+				}
+			}
+		}
+
+		co.FieldNameMapping = []copier.FieldNameMapping{
+			{SrcType: from, DstType: to, Mapping: mapping},
+		}
+	}
+}
+
+func Copy(to any, from any, opts ...CopyOption) error {
 
 	copierOption := copier.Option{
 		Converters: []copier.TypeConverter{
