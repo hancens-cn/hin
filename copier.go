@@ -37,7 +37,7 @@ func WithCopyDeep(v bool) CopyOption {
 	}
 }
 
-func WithFilter(from any, to any, keys []string, skipOrOnly bool) CopyOption {
+func WithFilter(from any, to any, skipOrOnly bool, keys ...string) CopyOption {
 	return func(co *copier.Option) {
 		fields := make([]string, 0)
 		mapping := map[string]string{}
