@@ -28,9 +28,19 @@ var JwtOptions = new(jwtOptions)
 
 type jwtOption func(*JwtClaims)
 
-func (jwtOptions) WithExpireTime(t time.Time) jwtOption {
+func (jwtOptions) WithAccessExpireTime(t time.Time) jwtOption {
 	return func(claims *JwtClaims) {
-		claims.ExpiresAt = jwt.NewNumericDate(t)
+		if claims.Issuer == JwtAccessKey {
+			claims.ExpiresAt = jwt.NewNumericDate(t)
+		}
+	}
+}
+
+func (jwtOptions) WithRefreshExpireTime(t time.Time) jwtOption {
+	return func(claims *JwtClaims) {
+		if claims.Issuer == JwtRefreshKey {
+			claims.ExpiresAt = jwt.NewNumericDate(t)
+		}
 	}
 }
 
@@ -55,16 +65,17 @@ func (jwtOptions) WithClaims(c *JwtClaims) jwtOption {
 func MakeDoubleToken(opts ...jwtOption) (*JwtTokens, error) {
 	claims := new(JwtClaims)
 
-	for _, o := range opts {
-		o(claims)
-	}
-
 	claims.IssuedAt = jwt.NewNumericDate(time.Now())
 	secretKey := getJwtSecret()
 	tokens := new(JwtTokens)
 
 	claims.Issuer = JwtAccessKey
 	claims.ExpiresAt = getExpire("jwt.expire.access")
+
+	for _, o := range opts {
+		o(claims)
+	}
+
 	t := jwt.NewWithClaims(jwt.SigningMethodHS512, claims)
 	if tk, err := t.SignedString(secretKey); err != nil {
 		return tokens, err
@@ -74,6 +85,11 @@ func MakeDoubleToken(opts ...jwtOption) (*JwtTokens, error) {
 
 	claims.Issuer = JwtRefreshKey
 	claims.ExpiresAt = getExpire("jwt.expire.refresh")
+
+	for _, o := range opts {
+		o(claims)
+	}
+
 	t = jwt.NewWithClaims(jwt.SigningMethodHS512, claims)
 	if tk, err := t.SignedString(secretKey); err != nil {
 		return tokens, err
