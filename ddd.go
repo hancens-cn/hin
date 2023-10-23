@@ -35,11 +35,13 @@ func NewBaseService[E any](
 }
 
 func (s *BaseSrv[E]) FindOne(ctx context.Context, query any) (E, error) {
-	return s.Repo.FindOne(ctx, Criteria(query))
+	d, r := s.Repo.FindOne(ctx, Criteria(query))
+	return d, r.Error
 }
 
 func (s *BaseSrv[E]) Find(ctx context.Context, query any) ([]E, error) {
-	return s.Repo.Find(ctx, Criteria(query))
+	d, r := s.Repo.Find(ctx, Criteria(query))
+	return d, r.Error
 }
 
 func (s *BaseSrv[E]) Paging(ctx context.Context, query any, paging PagingQuery) (PagingDTO, error) {
@@ -48,10 +50,10 @@ func (s *BaseSrv[E]) Paging(ctx context.Context, query any, paging PagingQuery) 
 		Count: paging.Count,
 	}
 
-	items, total, err := s.Repo.Paging(ctx, Criteria(query), paging)
-	if err != nil {
-		s.Logger.Error("baseSrv.Paging", zap.Error(err))
-		return dto, err
+	items, total, r := s.Repo.Paging(ctx, Criteria(query), paging)
+	if r.Error != nil {
+		s.Logger.Error("baseSrv.Paging", zap.Error(r.Error))
+		return dto, r.Error
 	}
 
 	dto.Items = items
@@ -61,7 +63,7 @@ func (s *BaseSrv[E]) Paging(ctx context.Context, query any, paging PagingQuery) 
 }
 
 func (s *BaseSrv[E]) Remove(ctx context.Context, query any) error {
-	return s.Repo.Remove(ctx, Criteria(query))
+	return s.Repo.Remove(ctx, Criteria(query)).Error
 }
 
 type BaseConverter[M any, E any] interface {
@@ -72,24 +74,54 @@ type BaseConverter[M any, E any] interface {
 }
 
 type BaseDAO[T any] interface {
-	Insert(ctx context.Context, model T) error
-	InsertMany(ctx context.Context, model []T) error
-	Find(ctx context.Context, filter any) ([]T, error)
-	FindOne(ctx context.Context, filter any) (T, error)
-	Update(ctx context.Context, filter any, model any) error
-	UpdateById(ctx context.Context, id any, model any) error
-	UpdateMany(ctx context.Context, filter any, model []any) error
-	CreateIndexes(ctx context.Context, models []mongo.IndexModel) error
-	Paging(ctx context.Context, filter any, paging PagingQuery) ([]T, int64, error)
+	Insert(ctx context.Context, model T) *MDR
+	InsertMany(ctx context.Context, model []T) *MDR
+	Find(ctx context.Context, filter any) ([]T, *MDR)
+	FindOne(ctx context.Context, filter any) (T, *MDR)
+	Update(ctx context.Context, filter any, model any) *MDR
+	UpdateById(ctx context.Context, id any, model any) *MDR
+	UpdateMany(ctx context.Context, filter any, model []any) *MDR
+	CreateIndexes(ctx context.Context, models []mongo.IndexModel) *MDR
+	Paging(ctx context.Context, filter any, paging PagingQuery) ([]T, int64, *MDR)
 }
 
 type BaseRepository[E any] interface {
-	Save(ctx context.Context, entity E) error
+	Save(ctx context.Context, entity E) *MDR
 	Exist(ctx context.Context, filter CriteriaBuilder) bool
-	Remove(ctx context.Context, filter CriteriaBuilder) error
-	Find(ctx context.Context, filter CriteriaBuilder) ([]E, error)
-	FindOne(ctx context.Context, filter CriteriaBuilder) (E, error)
-	Paging(ctx context.Context, filter CriteriaBuilder, paging PagingQuery) ([]E, int64, error)
+	Remove(ctx context.Context, filter CriteriaBuilder) *MDR
+	Find(ctx context.Context, filter CriteriaBuilder) ([]E, *MDR)
+	FindOne(ctx context.Context, filter CriteriaBuilder) (E, *MDR)
+	Paging(ctx context.Context, filter CriteriaBuilder, paging PagingQuery) ([]E, int64, *MDR)
+}
+
+// MDR is Mongo Database Result
+type MDR struct {
+	Count int64
+	Error error
+	IDs   []string
+}
+
+func (m *MDR) ID() string {
+	return m.IDs[0]
+}
+
+func (m *MDR) setID(id any) *MDR {
+	if id == nil {
+		return m
+	}
+
+	if v, ok := id.([]any); ok {
+		for _, i := range v {
+			m.IDs = append(m.IDs, i.(string))
+		}
+	} else {
+		m.IDs = append(m.IDs, id.(string))
+	}
+	return m
+}
+
+func newErrMDR(err error) *MDR {
+	return &MDR{Error: err}
 }
 
 type BaseRepo[M any, E any] struct {
@@ -171,7 +203,7 @@ func (r *BaseRepo[M, E]) ToEntity(m M) E {
 	return e
 }
 
-func (r *BaseRepo[M, E]) Save(ctx context.Context, entity E) error {
+func (r *BaseRepo[M, E]) Save(ctx context.Context, entity E) *MDR {
 	m := r.ToModel(entity)
 	rv := reflect.ValueOf(&m)
 	if v := rv.Elem().FieldByName("ID"); v.String() != "00000000000000000000" {
@@ -186,32 +218,32 @@ func (r *BaseRepo[M, E]) Save(ctx context.Context, entity E) error {
 	}
 }
 
-func (r *BaseRepo[M, E]) Find(ctx context.Context, filter CriteriaBuilder) ([]E, error) {
-	if ms, err := r.Dao.Find(ctx, filter.Mgo()); err != nil {
-		return nil, err
+func (r *BaseRepo[M, E]) Find(ctx context.Context, filter CriteriaBuilder) ([]E, *MDR) {
+	if ms, dr := r.Dao.Find(ctx, filter.Mgo()); dr.Error != nil {
+		return nil, dr
 	} else {
-		return r.ToEntities(ms), nil
+		return r.ToEntities(ms), dr
 	}
 }
 
-func (r *BaseRepo[M, E]) FindOne(ctx context.Context, filter CriteriaBuilder) (E, error) {
-	if m, err := r.Dao.FindOne(ctx, filter.Mgo()); err != nil {
+func (r *BaseRepo[M, E]) FindOne(ctx context.Context, filter CriteriaBuilder) (E, *MDR) {
+	if m, dr := r.Dao.FindOne(ctx, filter.Mgo()); dr.Error != nil {
 		var e E
-		return e, err
+		return e, dr
 	} else {
-		return r.ToEntity(m), nil
+		return r.ToEntity(m), dr
 	}
 }
 
-func (r *BaseRepo[M, E]) Paging(ctx context.Context, filter CriteriaBuilder, paging PagingQuery) ([]E, int64, error) {
-	if ms, count, err := r.Dao.Paging(ctx, filter.Mgo(), paging); err != nil {
-		return nil, 0, err
+func (r *BaseRepo[M, E]) Paging(ctx context.Context, filter CriteriaBuilder, paging PagingQuery) ([]E, int64, *MDR) {
+	if ms, count, dr := r.Dao.Paging(ctx, filter.Mgo(), paging); dr.Error != nil {
+		return nil, 0, dr
 	} else {
-		return r.ToEntities(ms), count, nil
+		return r.ToEntities(ms), count, dr
 	}
 }
 
-func (r *BaseRepo[M, E]) Remove(ctx context.Context, filter CriteriaBuilder) error {
+func (r *BaseRepo[M, E]) Remove(ctx context.Context, filter CriteriaBuilder) *MDR {
 	return r.Dao.Update(ctx, filter.Mgo(), bson.M{"deleted_at": time.Now()})
 }
 
@@ -255,68 +287,68 @@ func NewMongoDAO[T any](
 	}
 }
 
-func (d *BaseMongoDAO[T]) Insert(ctx context.Context, model T) error {
-	_, err := d.Col.InsertOne(ctx, model)
-	return err
+func (d *BaseMongoDAO[T]) Insert(ctx context.Context, model T) *MDR {
+	r, err := d.Col.InsertOne(ctx, model)
+	return (&MDR{Error: err}).setID(r.InsertedID)
 }
 
-func (d *BaseMongoDAO[T]) InsertMany(ctx context.Context, model []T) error {
+func (d *BaseMongoDAO[T]) InsertMany(ctx context.Context, model []T) *MDR {
 	var ms []any
 	for _, m := range model {
 		ms = append(ms, m)
 	}
-	_, err := d.Col.InsertMany(ctx, ms)
-	return err
+	r, err := d.Col.InsertMany(ctx, ms)
+	return (&MDR{Error: err}).setID(r.InsertedIDs)
 }
 
-func (d *BaseMongoDAO[T]) Update(ctx context.Context, filter any, model any) error {
-	_, err := d.Col.UpdateOne(ctx, filter, bson.M{"$set": model})
-	return err
+func (d *BaseMongoDAO[T]) Update(ctx context.Context, filter any, model any) *MDR {
+	r, err := d.Col.UpdateOne(ctx, filter, bson.M{"$set": model})
+	return (&MDR{Error: err, Count: r.ModifiedCount}).setID(r.UpsertedID)
 }
 
-func (d *BaseMongoDAO[T]) UpdateById(ctx context.Context, id any, model any) error {
-	_, err := d.Col.UpdateByID(ctx, id, bson.M{"$set": model})
-	return err
+func (d *BaseMongoDAO[T]) UpdateById(ctx context.Context, id any, model any) *MDR {
+	r, err := d.Col.UpdateByID(ctx, id, bson.M{"$set": model})
+	return (&MDR{Error: err, Count: r.ModifiedCount}).setID(r.UpsertedID)
 }
 
-func (d *BaseMongoDAO[T]) UpdateMany(ctx context.Context, filter any, model []any) error {
-	_, err := d.Col.UpdateMany(ctx, filter, bson.M{"$set": model})
-	return err
+func (d *BaseMongoDAO[T]) UpdateMany(ctx context.Context, filter any, model []any) *MDR {
+	r, err := d.Col.UpdateMany(ctx, filter, bson.M{"$set": model})
+	return (&MDR{Error: err, Count: r.ModifiedCount}).setID(r.UpsertedID)
 }
 
-func (d *BaseMongoDAO[T]) Find(ctx context.Context, filter any) ([]T, error) {
+func (d *BaseMongoDAO[T]) Find(ctx context.Context, filter any) ([]T, *MDR) {
 	opts := new(mopt.FindOptions)
 	opts.SetSort(bson.D{{"created_at", -1}})
 	cur, err := d.Col.Find(ctx, filter, opts)
 	defer cur.Close(ctx)
 	if err != nil {
-		return nil, err
+		return nil, newErrMDR(err)
 	}
 
 	r := make([]T, 0)
 	for cur.Next(ctx) {
 		var result T
 		if err := cur.Decode(&result); err != nil {
-			return nil, err
+			return nil, newErrMDR(err)
 		}
 		r = append(r, result)
 	}
 
-	return r, nil
+	return r, new(MDR)
 }
 
-func (d *BaseMongoDAO[T]) FindOne(ctx context.Context, filter any) (T, error) {
+func (d *BaseMongoDAO[T]) FindOne(ctx context.Context, filter any) (T, *MDR) {
 	opts := new(mopt.FindOneOptions)
 	opts.SetSort(bson.D{{"created_at", -1}})
 	cur := d.Col.FindOne(ctx, filter, opts)
 	var r T
 	if err := cur.Decode(&r); err != nil {
-		return r, err
+		return r, newErrMDR(err)
 	}
-	return r, nil
+	return r, new(MDR)
 }
 
-func (d *BaseMongoDAO[T]) Paging(ctx context.Context, filter any, paging PagingQuery) ([]T, int64, error) {
+func (d *BaseMongoDAO[T]) Paging(ctx context.Context, filter any, paging PagingQuery) ([]T, int64, *MDR) {
 	opts := new(mopt.FindOptions)
 	opts.SetSort(bson.D{{"created_at", -1}})
 	opts.SetLimit(paging.Count)
@@ -325,26 +357,26 @@ func (d *BaseMongoDAO[T]) Paging(ctx context.Context, filter any, paging PagingQ
 	cur, err := d.Col.Find(ctx, filter, opts)
 	defer cur.Close(ctx)
 	if err != nil {
-		return nil, 0, err
+		return nil, 0, newErrMDR(err)
 	}
 
 	r := make([]T, 0)
 	for cur.Next(ctx) {
 		var result T
 		if err := cur.Decode(&result); err != nil {
-			return nil, 0, err
+			return nil, 0, newErrMDR(err)
 		}
 		r = append(r, result)
 	}
 
 	total, err := d.Col.CountDocuments(ctx, filter)
 	if err != nil {
-		return nil, total, err
+		return nil, total, newErrMDR(err)
 	}
-	return r, total, nil
+	return r, total, new(MDR)
 }
 
-func (d *BaseMongoDAO[T]) CreateIndexes(ctx context.Context, models []mongo.IndexModel) error {
+func (d *BaseMongoDAO[T]) CreateIndexes(ctx context.Context, models []mongo.IndexModel) *MDR {
 	_, err := d.Col.Indexes().CreateMany(ctx, models)
-	return err
+	return newErrMDR(err)
 }
