@@ -308,7 +308,7 @@ func (d *BaseMongoDAO[T]) Update(ctx context.Context, filter any, model any) *MD
 
 func (d *BaseMongoDAO[T]) UpdateById(ctx context.Context, id any, model any) *MDR {
 	r, err := d.Col.UpdateByID(ctx, id, bson.M{"$set": model})
-	return (&MDR{Error: err, Count: r.ModifiedCount}).setID(r.UpsertedID)
+	return (&MDR{Error: err, Count: r.ModifiedCount}).setID(id)
 }
 
 func (d *BaseMongoDAO[T]) UpdateMany(ctx context.Context, filter any, model []any) *MDR {
