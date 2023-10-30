@@ -35,8 +35,11 @@ func UnRegisterContext(key string) {
 }
 
 func GetCurrentContext(ctx context.Context) *CurrentContext {
-	key := ctx.Value(headerXRequestID).(string)
-	if ctx, ok := ctxMap[key]; ok {
+	key := ctx.Value(headerXRequestID)
+
+	if v, ok := key.(string); !ok {
+		return nil
+	} else if ctx, ok := ctxMap[v]; ok {
 		return ctx
 	}
 
