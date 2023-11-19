@@ -111,12 +111,19 @@ func (m *MDR) setID(id any) *MDR {
 	}
 
 	if v, ok := id.([]any); ok {
+		m.Count = int64(len(v))
 		for _, i := range v {
 			m.IDs = append(m.IDs, i.(string))
 		}
 	} else {
+		m.Count = 1
 		m.IDs = append(m.IDs, id.(string))
 	}
+	return m
+}
+
+func (m *MDR) SetCount(count int64) *MDR {
+	m.Count = count
 	return m
 }
 
@@ -248,9 +255,8 @@ func (r *BaseRepo[M, E]) Remove(ctx context.Context, filter CriteriaBuilder) *MD
 }
 
 func (r *BaseRepo[M, E]) Exist(ctx context.Context, filter CriteriaBuilder) bool {
-	var e E
-	entity, err := r.FindOne(ctx, filter)
-	return err == nil && !reflect.DeepEqual(entity, e)
+	_, mdr := r.FindOne(ctx, filter)
+	return mdr.Count > 0
 }
 
 type BaseMongoDAO[T any] struct {
@@ -334,7 +340,7 @@ func (d *BaseMongoDAO[T]) Find(ctx context.Context, filter any) ([]T, *MDR) {
 		r = append(r, result)
 	}
 
-	return r, new(MDR)
+	return r, new(MDR).SetCount(int64(len(r)))
 }
 
 func (d *BaseMongoDAO[T]) FindOne(ctx context.Context, filter any) (T, *MDR) {
@@ -345,7 +351,8 @@ func (d *BaseMongoDAO[T]) FindOne(ctx context.Context, filter any) (T, *MDR) {
 	if err := cur.Decode(&r); err != nil {
 		return r, newErrMDR(err)
 	}
-	return r, new(MDR)
+
+	return r, new(MDR).SetCount(1)
 }
 
 func (d *BaseMongoDAO[T]) Paging(ctx context.Context, filter any, paging PagingQuery) ([]T, int64, *MDR) {
@@ -373,7 +380,7 @@ func (d *BaseMongoDAO[T]) Paging(ctx context.Context, filter any, paging PagingQ
 	if err != nil {
 		return nil, total, newErrMDR(err)
 	}
-	return r, total, new(MDR)
+	return r, total, new(MDR).SetCount(int64(len(r)))
 }
 
 func (d *BaseMongoDAO[T]) CreateIndexes(ctx context.Context, models []mongo.IndexModel) *MDR {
