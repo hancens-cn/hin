@@ -220,6 +220,12 @@ func (r *BaseRepo[M, E]) Save(ctx context.Context, entity E) *MDR {
 		}
 		return r.Dao.UpdateById(ctx, v.String(), m)
 	} else {
+		if v := rv.Elem().FieldByName("CreatedAt"); v.IsValid() {
+			v.Set(reflect.ValueOf(time.Now()))
+		}
+		if v := rv.Elem().FieldByName("UpdatedAt"); v.IsValid() {
+			v.Set(reflect.ValueOf(time.Now()))
+		}
 		v.SetString(NewID().String())
 		return r.Dao.Insert(ctx, m)
 	}
