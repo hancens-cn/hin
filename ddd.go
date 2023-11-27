@@ -83,6 +83,7 @@ type BaseDAO[T any] interface {
 	UpdateMany(ctx context.Context, filter any, model []any) *MDR
 	CreateIndexes(ctx context.Context, models []mongo.IndexModel) *MDR
 	Paging(ctx context.Context, filter any, paging PagingQuery) ([]T, int64, *MDR)
+	Count(ctx context.Context, filter any) (int64, error)
 }
 
 type BaseRepository[E any] interface {
@@ -92,6 +93,7 @@ type BaseRepository[E any] interface {
 	Find(ctx context.Context, filter CriteriaBuilder) ([]E, *MDR)
 	FindOne(ctx context.Context, filter CriteriaBuilder) (E, *MDR)
 	Paging(ctx context.Context, filter CriteriaBuilder, paging PagingQuery) ([]E, int64, *MDR)
+	Count(ctx context.Context, filter CriteriaBuilder) int64
 }
 
 // MDR is Mongo Database Result
@@ -265,6 +267,11 @@ func (r *BaseRepo[M, E]) Exist(ctx context.Context, filter CriteriaBuilder) bool
 	return mdr.Count > 0
 }
 
+func (r *BaseRepo[M, E]) Count(ctx context.Context, filter CriteriaBuilder) int64 {
+	count, _ := r.Dao.Count(ctx, filter.Mgo())
+	return count
+}
+
 type BaseMongoDAO[T any] struct {
 	Logger *Logger
 	Client *mongo.Client
@@ -392,4 +399,8 @@ func (d *BaseMongoDAO[T]) Paging(ctx context.Context, filter any, paging PagingQ
 func (d *BaseMongoDAO[T]) CreateIndexes(ctx context.Context, models []mongo.IndexModel) *MDR {
 	_, err := d.Col.Indexes().CreateMany(ctx, models)
 	return newErrMDR(err)
+}
+
+func (d *BaseMongoDAO[T]) Count(ctx context.Context, filter any) (int64, error) {
+	return d.Col.CountDocuments(ctx, filter)
 }
